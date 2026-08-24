@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 4000;
 const ALLOWED_ORIGINS = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(",")
   : ["http://localhost:5173"];
+console.log("👉 ALLOWED_ORIGINS đang dùng:", ALLOWED_ORIGINS);
 
 // ---------- MongoDB ----------
 mongoose
