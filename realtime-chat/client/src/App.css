@@ -13,3 +13,36 @@
 .message-image:hover {
   opacity: 0.92;
 }
+
+/* Chỉ khu vực tin nhắn được cuộn; header, sidebar và ô nhập luôn cố định. */
+.chat-layout {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar,
+.chat-main {
+  min-height: 0;
+}
+
+.sidebar {
+  overflow: hidden;
+}
+
+.people-list,
+.messages {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.chat-main {
+  overflow: hidden;
+}
+
+.chat-header,
+.composer {
+  flex: 0 0 auto;
+}
