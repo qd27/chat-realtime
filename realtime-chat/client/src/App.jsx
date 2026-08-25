@@ -28,6 +28,23 @@ function formatTime(time) {
   }
 }
 
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (err) {
+    console.error("Không phát được âm thanh thông báo:", err);
+  }
+}
 export default function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -41,7 +58,7 @@ export default function App() {
   const endRef = useRef(null);
   const typingRef = useRef(null);
   const fileInputRef = useRef(null);
-
+  const usernameRef = useRef(username);
   useEffect(() => {
     const s = io(SERVER_URL, { transports: ["websocket"] });
     setSocket(s);
@@ -58,7 +75,10 @@ export default function App() {
         }))
       );
     });
-    s.on("chat-message", (msg) => setMessages((prev) => [...prev, msg]));
+    s.on("chat-message", (msg) => {
+      setMessages((prev) => [...prev, msg]);
+      if (msg.username !== usernameRef.current) playNotificationSound();
+    });
     s.on("system-message", (text) => setMessages((prev) => [...prev, { id: `sys-${Date.now()}`, system: true, text }]));
     s.on("online-users", setOnlineUsers);
     s.on("typing", setTypingUser);
@@ -66,8 +86,8 @@ export default function App() {
     return () => s.disconnect();
   }, []);
 
+  useEffect(() => { usernameRef.current = username; }, [username]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
   const join = (e) => { e.preventDefault(); if (!username.trim() || !socket) return; socket.emit("join", username.trim()); setJoined(true); };
   const send = (e) => { e.preventDefault(); if (!input.trim() || !socket) return; socket.emit("chat-message", { text: input.trim(), username }); socket.emit("stop-typing"); setInput(""); };
   const type = (value) => { setInput(value); if (!socket) return; socket.emit("typing", username); clearTimeout(typingRef.current); typingRef.current = setTimeout(() => socket.emit("stop-typing"), 1200); };
