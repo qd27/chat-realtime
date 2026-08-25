@@ -59,6 +59,7 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   displayName: { type: String, required: true },
   totalSecondsUsed: { type: Number, default: 0 },
+  lastResetAt: { type: Date, default: Date.now }, // mốc lần reset giờ chat gần nhất
   paidUntil: { type: Date, default: null }, // để trống, dùng cho tính năng trả phí sau này
   createdAt: { type: Date, default: Date.now },
 });
@@ -94,6 +95,28 @@ async function trimOldMessages() {
 // ---------- Helper auth ----------
 function isPaid(user) {
   return !!(user.paidUntil && new Date(user.paidUntil) > new Date());
+}
+
+// Mốc bắt đầu "chu kỳ chat" hiện tại: mỗi ngày lúc 3h sáng.
+// Nếu giờ hiện tại chưa tới 3h sáng, chu kỳ vẫn tính từ 3h sáng hôm qua.
+function getCurrentPeriodStart(now = new Date()) {
+  const period = new Date(now);
+  period.setHours(3, 0, 0, 0);
+  if (now < period) {
+    period.setDate(period.getDate() - 1);
+  }
+  return period;
+}
+
+// Nếu lần reset gần nhất của user cũ hơn mốc 3h sáng của chu kỳ hiện tại -> reset về 0
+async function resetIfNeeded(user) {
+  const periodStart = getCurrentPeriodStart();
+  if (!user.lastResetAt || user.lastResetAt < periodStart) {
+    user.totalSecondsUsed = 0;
+    user.lastResetAt = new Date();
+    await user.save();
+  }
+  return user;
 }
 
 function signToken(user) {
@@ -193,6 +216,7 @@ app.post("/api/login", async (req, res) => {
     if (!user) return res.status(401).json({ error: "Email hoặc mật khẩu không đúng" });
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Email hoặc mật khẩu không đúng" });
+    await resetIfNeeded(user);
     const token = signToken(user);
     res.cookie(COOKIE_NAME, token, cookieOptions);
     res.json({ user: toSafeUser(user) });
@@ -211,6 +235,7 @@ app.get("/api/me", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(401).json({ error: "Không tìm thấy user" });
+    await resetIfNeeded(user);
     res.json({ user: toSafeUser(user) });
   } catch (err) {
     console.error("Lỗi /api/me:", err);
@@ -245,6 +270,7 @@ io.use(async (socket, next) => {
     const payload = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(payload.uid);
     if (!user) return next(new Error("unauthorized"));
+    await resetIfNeeded(user);
     socket.user = user;
     next();
   } catch (err) {
