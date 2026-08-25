@@ -31,6 +31,25 @@ const messageSchema = new mongoose.Schema({
 
 const Message = mongoose.model("Message", messageSchema);
 
+const MAX_MESSAGES = 200; // giữ tối đa 200 tin gần nhất
+
+async function trimOldMessages() {
+  try {
+    const count = await Message.countDocuments();
+    if (count > MAX_MESSAGES) {
+      const excess = count - MAX_MESSAGES;
+      const oldMessages = await Message.find()
+        .sort({ time: 1 })
+        .limit(excess)
+        .select("_id");
+      const ids = oldMessages.map((m) => m._id);
+      await Message.deleteMany({ _id: { $in: ids } });
+      console.log(`🧹 Đã dọn ${ids.length} tin nhắn cũ (vượt giới hạn ${MAX_MESSAGES})`);
+    }
+  } catch (err) {
+    console.error("Lỗi khi dọn tin nhắn cũ:", err);
+  }
+}
 // ---------- Cloudinary ----------
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -126,6 +145,7 @@ io.on("connection", (socket) => {
 
     try {
       await Message.create(message);
+      trimOldMessages(); // không cần await, chạy nền, không làm chậm tin nhắn đang gửi
     } catch (err) {
       console.error("Lỗi khi lưu tin nhắn:", err);
     }
