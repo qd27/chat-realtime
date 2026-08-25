@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "build": "echo 'no build step needed'"
+
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
